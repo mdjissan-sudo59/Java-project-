@@ -1,0 +1,249 @@
+// Import necessary Java libraries
+import java.util.*;                   // For Scanner and utility classes
+import java.time.*;                   // For date and time management
+import java.time.format.DateTimeFormatter; // For formatting date and time
+
+// Main class of the program
+public class Main {
+
+    // Nested static class representing a Car
+    static class Car {
+        String plateNumber;   // Vehicle registration number
+        String owner;         // Owner name
+        String model;         // Car model
+        long entryTime;       // Time when car entered (in milliseconds)
+
+        // Constructor to initialize Car object
+        Car(String plateNumber, String owner, String model, long entryTime) {
+            this.plateNumber = plateNumber;   // Assign plate number
+            this.owner = owner;               // Assign owner name
+            this.model = model;               // Assign model
+            this.entryTime = entryTime;       // Record entry time
+        }
+    }
+
+    // Main method – program execution starts here
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);  // Scanner for user input
+
+        System.out.print("Enter total number of parking slots: ");
+        int totalSlots;
+        try {
+            totalSlots = Integer.parseInt(sc.nextLine());  // Read total slots
+        } catch (Exception e) {
+            System.out.println("Invalid input. Using default 10 slots.");
+            totalSlots = 10;  // Default value if invalid input
+        }
+
+        Car[] slots = new Car[totalSlots];    // Array to represent parking slots
+        double totalRevenue = 0;              // Total earnings
+        int totalCarsServed = 0;              // Total cars served
+        final double RATE_PER_HOUR = 50.0;    // Parking rate per hour
+
+        // Infinite loop for menu-driven system
+        while (true) {
+            System.out.println("\n===============================================");
+            System.out.println("         🚗 SMART PARKING MANAGEMENT SYSTEM");
+            System.out.println("===============================================");
+            int occupied = countOccupied(slots);  // Count occupied slots
+            System.out.printf("Total Slots: %d | Occupied: %d | Available: %d%n", totalSlots, occupied, totalSlots - occupied);
+            System.out.println("===============================================");
+
+            // Menu options
+            System.out.println("""
+                    [1] Park a Car (auto-assign first available)
+                    [2] Remove a Car (by slot or plate)
+                    [3] Show Parking Status
+                    [4] Search Car by Plate
+                    [5] Show Report
+                    [6] Exit
+                    """);
+
+            System.out.print("👉 Choose an option (1-6): ");
+            int choice;
+            try {
+                choice = Integer.parseInt(sc.nextLine());  // Read user choice
+            } catch (Exception e) {
+                System.out.println("\n⚠ Invalid input. Please enter a number between 1 and 6.");
+                continue;  // Skip to next loop
+            }
+
+            // Switch case for menu selection
+            switch (choice) {
+                case 1 -> { // Park car
+                    int idx = firstAvailableSlot(slots); // Find empty slot
+                    if (idx == -1) {
+                        System.out.println("\n❌ No available slots right now.");
+                        break;
+                    }
+
+                    // Get car details
+                    System.out.print("Enter Plate Number: ");
+                    String plate = sc.nextLine().trim();
+                    System.out.print("Enter Owner Name: ");
+                    String owner = sc.nextLine().trim();
+                    System.out.print("Enter Car Model: ");
+                    String model = sc.nextLine().trim();
+
+                    // Create new Car object and park it
+                    slots[idx] = new Car(plate, owner, model, System.currentTimeMillis());
+                    System.out.printf("\n✅ Car parked successfully at Slot #%d%n", idx + 1);
+                }
+
+                case 2 -> { // Remove car
+                    System.out.println("\nRemove Options:");
+                    System.out.println("[1] Remove by Slot Number");
+                    System.out.println("[2] Remove by Plate Number");
+                    System.out.print("👉 Choose: ");
+
+                    int how;
+                    try {
+                        how = Integer.parseInt(sc.nextLine());  // Choose removal method
+                    } catch (Exception e) {
+                        System.out.println("⚠ Invalid input.");
+                        break;
+                    }
+
+                    int idx = -1;  // Slot index
+                    if (how == 1) {
+                        System.out.print("Enter Slot Number: ");
+                        try {
+                            idx = Integer.parseInt(sc.nextLine()) - 1;  // Slot index input
+                        } catch (Exception e) {
+                            System.out.println("⚠ Invalid slot number.");
+                            break;
+                        }
+                    } else if (how == 2) {
+                        System.out.print("Enter Plate Number: ");
+                        String plate = sc.nextLine().trim();
+                        idx = findByPlate(slots, plate);  // Find by plate
+                    } else {
+                        System.out.println("⚠ Invalid choice.");
+                        break;
+                    }
+
+                    if (idx < 0 || idx >= totalSlots || slots[idx] == null) {
+                        System.out.println("\n❌ Invalid slot or no car found.");
+                        break;
+                    }
+
+                    // Calculate duration and fee
+                    Car c = slots[idx];
+                    long now = System.currentTimeMillis();  // Current time
+                    double hours = (now - c.entryTime) / (1000.0 * 60 * 60);  // Convert ms to hours
+                    hours = Math.max(1, Math.ceil(hours));  // Round up hours
+                    double fee = hours * RATE_PER_HOUR;     // Fee calculation
+
+                    // Print billing receipt
+                    System.out.println("\n-----------------------------------------------");
+                    System.out.println("                🧾 BILLING RECEIPT");
+                    System.out.println("-----------------------------------------------");
+                    System.out.println("Plate Number : " + c.plateNumber);
+                    System.out.println("Owner Name   : " + c.owner);
+                    System.out.println("Car Model    : " + c.model);
+                    System.out.println("Entry Time   : " + formatDateTime(c.entryTime));
+                    System.out.printf("Duration     : %.2f hours%n", hours);
+                    System.out.printf("Parking Fee  : ₹%.2f%n", fee);
+                    System.out.println("-----------------------------------------------");
+
+                    // Update report data
+                    slots[idx] = null;               // Free the slot
+                    totalRevenue += fee;             // Add to revenue
+                    totalCarsServed++;               // Increment served cars
+                    System.out.printf("✅ Car removed successfully from Slot #%d%n", idx + 1);
+                }
+
+                case 3 -> { // Show parking status
+                    System.out.println("\n============== 🅿 PARKING STATUS ==============");
+                    for (int i = 0; i < totalSlots; i++) {
+                        if (slots[i] == null) {
+                            System.out.printf("Slot #%02d : Available%n", i + 1); // Empty slot
+                        } else {
+                            Car c = slots[i];
+                            System.out.printf("Slot #%02d : OCCUPIED | %-10s | %-10s | Owner: %-10s%n",
+                                    i + 1, c.plateNumber, c.model, c.owner);  // Occupied slot
+                        }
+                    }
+                    System.out.println("===============================================");
+                }
+
+                case 4 -> { // Search by plate number
+                    System.out.print("\nEnter Plate Number to Search: ");
+                    String plate = sc.nextLine().trim();
+                    int idx = findByPlate(slots, plate); // Find car
+                    if (idx == -1) {
+                        System.out.println("\n❌ Car not found.");
+                    } else {
+                        Car c = slots[idx];
+                        System.out.println("\n✅ Car Found!");
+                        System.out.println("-----------------------------------------------");
+                        System.out.println("Slot Number  : " + (idx + 1));
+                        System.out.println("Owner Name   : " + c.owner);
+                        System.out.println("Car Model    : " + c.model);
+                        System.out.println("Parked Since : " + formatDateTime(c.entryTime));
+                        System.out.println("-----------------------------------------------");
+                    }
+                }
+
+                case 5 -> { // Report option
+                    System.out.println("\n============== 📊 PARKING REPORT ==============");
+                    System.out.printf("Total Revenue Earned : ₹%.2f%n", totalRevenue); // Total money
+                    System.out.println("Total Cars Served    : " + totalCarsServed);   // Cars handled
+                    System.out.println("Currently Parked Cars:");
+                    System.out.println("-----------------------------------------------");
+                    boolean any = false;
+                    for (int i = 0; i < totalSlots; i++) {
+                        Car c = slots[i];
+                        if (c != null) {
+                            any = true;
+                            System.out.printf("Slot #%02d : %-10s | %-10s | Owner: %-10s%n",
+                                    i + 1, c.plateNumber, c.model, c.owner); // Show parked cars
+                        }
+                    }
+                    if (!any) System.out.println("No cars currently parked."); // If none
+                    System.out.println("===============================================");
+                }
+
+                case 6 -> { // Exit program
+                    System.out.println("\n👋 Exiting System... Thank you for using Smart Parking!");
+                    sc.close();          // Close scanner
+                    System.exit(0);      // Exit program
+                }
+
+                default -> System.out.println("\n⚠ Invalid choice. Please enter a number from 1 to 6."); // Invalid menu option
+            }
+        }
+    }
+
+    // Function to find first empty slot
+    private static int firstAvailableSlot(Car[] slots) {
+        for (int i = 0; i < slots.length; i++)
+            if (slots[i] == null) return i;  // Return index of first empty slot
+        return -1; // No slot available
+    }
+
+    // Function to find car by plate number
+    private static int findByPlate(Car[] slots, String plate) {
+        for (int i = 0; i < slots.length; i++) {
+            Car c = slots[i];
+            if (c != null && c.plateNumber.equalsIgnoreCase(plate)) return i; // Match found
+        }
+        return -1; // Not found
+    }
+
+    // Function to count occupied slots
+    private static int countOccupied(Car[] slots) {
+        int count = 0;
+        for (Car c : slots)
+            if (c != null) count++; // Increment if occupied
+        return count;
+    }
+
+    // Function to format milliseconds to readable date/time
+    private static String formatDateTime(long epochMillis) {
+        LocalDateTime dt = Instant.ofEpochMilli(epochMillis)   // Convert milliseconds to time
+                .atZone(ZoneId.systemDefault())                // Use system timezone
+                .toLocalDateTime();                            // Convert to LocalDateTime
+        return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")); // Format as string
+    }
+}
